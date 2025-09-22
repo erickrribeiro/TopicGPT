@@ -1,3 +1,5 @@
+from openai import OpenAI
+
 class Client:
     def __init__(self, api_key: str, azure_endpoint: dict = None) -> None:
         if azure_endpoint:
@@ -6,7 +8,13 @@ class Client:
         else:
             from openai import OpenAI
             self.client = OpenAI(api_key=api_key)
-    
+
+    @staticmethod
+    def from_openai(client: OpenAI):
+        cls = Client(api_key="")
+        cls.client = client
+        return cls
+
     def __getattr__(self, name):
         """Delegate attribute access to the self.client object."""
         return getattr(self.client, name)

@@ -39,6 +39,7 @@ class TopicGPT:
              compute_vocab_hyperparams: dict = {},
              enhancer: TopwordEnhancement = None,
              topic_prompting: TopicPrompting = None,
+             client: Client = None,
              verbose: bool = True) -> None:
         
         """
@@ -66,10 +67,13 @@ class TopicGPT:
             verbose (bool, optional): Whether to print detailed information about the process. This can be overridden by arguments in passed objects.
         """
         
+        if client is None:
+            # Do some checks on the input arguments 
+            assert api_key is not None, "You need to provide an OpenAI API key."
+            self.client = Client(api_key = api_key, azure_endpoint = azure_endpoint)
+        else:
+            self.client = client
 
-
-        # Do some checks on the input arguments
-        assert api_key is not None, "You need to provide an OpenAI API key."
         assert n_topics is None or n_topics > 0, "The number of topics needs to be a positive integer."
         assert max_number_of_tokens > 0, "The maximum number of tokens needs to be a positive integer."
         assert max_number_of_tokens_embedding > 0, "The maximum number of tokens for the embedding model needs to be a positive integer."
@@ -77,9 +81,6 @@ class TopicGPT:
         assert n_topwords_description > 0, "The number of top words for the topic description needs to be a positive integer."
         assert len(topword_extraction_methods) > 0, "You need to provide at least one topword extraction method."
         assert n_topwords_description <= n_topwords, "The number of top words for the topic description needs to be smaller or equal to the number of top words."
-
-        self.client = Client(api_key = api_key, azure_endpoint = azure_endpoint)
-
 
         self.n_topics = n_topics
         self.openai_prompting_model = openai_prompting_model
