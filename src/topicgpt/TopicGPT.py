@@ -14,6 +14,7 @@ import topicgpt.TopicRepresentation as TopicRepresentation
 
 
 embeddings_path= "SavedEmbeddings/embeddings.pkl" #global variable for the path to the embeddings
+topic_path = "SavedEmbeddings/topic.pkl" #global variable for the path to the topics
 
 class TopicGPT:
     """
@@ -33,6 +34,8 @@ class TopicGPT:
              max_number_of_tokens_embedding: int = 8191,
              use_saved_embeddings: bool = True,
              path_saved_embeddings: str = embeddings_path,
+             use_saved_topics: bool = True,
+             path_saved_topics: str = topic_path,
              clusterer: Clustering_and_DimRed = None,
              n_topwords: int = 2000,
              n_topwords_description: int = 500,
@@ -58,6 +61,8 @@ class TopicGPT:
             max_number_of_tokens_embedding (int, optional): Maximum number of tokens to use for the OpenAI API when computing embeddings.
             use_saved_embeddings (bool, optional): Whether to use saved embeddings. If True, embeddings are loaded from the file 'SavedEmbeddings/embeddings.pkl' or path_saved_embeddings if different. If False, embeddings are computed using the OpenAI API and saved to the file.
             path_saved_embeddings (str, optional): Path to the saved embeddings file.
+            use_saved_topics (bool, optional): Whether to use saved topics. If True, topics are loaded from the file 'SavedEmbeddings/topic.pkl' or path_saved_topics if different. If False, topics are computed and saved to the file.
+            path_saved_topics (str, optional): Path to the saved topics file.
             clusterer (Clustering_and_DimRed, optional): Clustering and dimensionality reduction object. Find the class in the "Clustering/Clustering" folder. If None, a clustering object with default parameters is used. Note that providing document and vocab embeddings and an embedding object at the same time is not sensible; the number of topics specified in the clusterer will overwrite the n_topics argument.
             n_topwords (int, optional): Number of top words to extract and save for each topic. Note that fewer top words might be used later.
             n_topwords_description (int, optional): Number of top words to provide to the LLM (Language Model) to describe the topic.
@@ -100,12 +105,15 @@ class TopicGPT:
         self.enhancer = enhancer
         self.topic_prompting = topic_prompting	
         self.use_saved_embeddings = use_saved_embeddings
+        self.use_saved_topics = use_saved_topics
+        self.path_saved_topics = path_saved_topics
         self.verbose = verbose
 
         self.compute_vocab_hyperparams["verbose"] = self.verbose
         
         # if embeddings have already been downloaded to the folder SavedEmbeddings, then load them
         if self.use_saved_embeddings and os.path.exists(path_saved_embeddings):
+            print("Loading saved embeddings from ", path_saved_embeddings)
             with open(path_saved_embeddings, "rb") as f:
                 self.document_embeddings, self.vocab_embeddings = pickle.load(f)
 
@@ -260,29 +268,32 @@ class TopicGPT:
         len_after_removing = len(self.corpus)
         if verbose:
             print("Removed " + str(len_before_removing - len_after_removing) + " empty documents.")
-
-        if self.vocab_embeddings is None:
-            if verbose:
-                print("Computing vocabulary...")
-
-            self.vocab = self.extractor.compute_corpus_vocab(self.corpus, **self.compute_vocab_hyperparams)
+        if self.use_saved_topics and os.path.exists(self.path_saved_topics):
+            print("Loading saved topics from ", self.path_saved_topics)
+            with open(self.path_saved_topics, "rb") as f:
+                self.topic_lis, self.vocab_embeddings, self.document_embeddings, self.vocab = pickle.load(f)
         else:
-            print('Vocab already computed')
-            self.vocab = list(self.vocab_embeddings.keys())
+            if self.vocab_embeddings is None:
+                if verbose:
+                    print("Computing vocabulary...")
 
-        if self.vocab_embeddings is None or self.document_embeddings is None:  
+                self.vocab = self.extractor.compute_corpus_vocab(self.corpus, **self.compute_vocab_hyperparams)
+            else:
+                print('Vocab already computed')
+                self.vocab = list(self.vocab_embeddings.keys())
+
+            if self.vocab_embeddings is None or self.document_embeddings is None:  
+                if verbose:
+                    print("Computing embeddings...")
+                self.compute_embeddings(corpus = self.corpus)
+            else:
+                print('Embeddings already computed')
+            if verbose: 
+                print("Extracting topics...")
+            self.topic_lis = self.extract_topics(corpus = self.corpus)
             if verbose:
-                print("Computing embeddings...")
-            self.compute_embeddings(corpus = self.corpus)
-        else:
-            print('Embeddings already computed')
-        if verbose: 
-            print("Extracting topics...")
-        self.topic_lis = self.extract_topics(corpus = self.corpus)
-
-        if verbose:
-            print("Describing topics...")
-        self.topic_lis = self.describe_topics(topics = self.topic_lis)
+                print("Describing topics...")
+            self.topic_lis = self.describe_topics(topics = self.topic_lis)
 
         self.topic_prompting.topic_lis = self.topic_lis
         self.topic_prompting.vocab_embeddings = self.vocab_embeddings
@@ -397,4 +408,26 @@ class TopicGPT:
 
         with open(path, "wb") as f:
             pickle.dump([self.document_embeddings, self.vocab_embeddings], f)
+        
+        print("Saved embeddings to ", path)
+    
+    def save_topics(self, path: str = topic_path) -> None:
+        """
+        Saves the topics, vocabulary embeddings, document embeddings, and vocabulary to a pickle file for later re-use.
+
+        Args:
+            path (str, optional): The path to save the topics to. Defaults to topic_path.
+        """
+
+
+        assert self.topic_lis is not None and self.vocab_embeddings is not None and self.document_embeddings is not None and self.vocab is not None, "You need to extract the topics first."
+
+        # create dictionary if it doesn't exist yet 
+        if not os.path.exists("SavedEmbeddings"):
+            os.makedirs("SavedEmbeddings")
+
+        with open(path, "wb") as f:
+            pickle.dump([self.topic_lis, self.vocab_embeddings, self.document_embeddings, self.vocab], f)
+
+        print("Saved topics to ", path)
 
