@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pickle
+from typing import Optional
 # make sure the import works even if the package has not been installed and just the files are used
 from topicgpt.Clustering import Clustering_and_DimRed
 from topicgpt.ExtractTopWords import ExtractTopWords
@@ -221,6 +222,26 @@ class TopicGPT:
 
         return self.topic_lis
     
+    def predict(self, text: str) -> Optional[Topic]:
+        """
+        Predicts the topic of a given text.
+
+        Args:
+            text (str): The text to predict the topic for.
+
+        Returns:
+            Topic: The predicted Topic
+        """
+
+        assert self.topic_lis is not None, "You need to extract the topics first."
+        topic = None
+        topic_id = self.topic_prompting.identify_topic_idx(text)
+        
+        if topic_id is not None and topic_id > 0:
+            topic = self.topic_lis[topic_id]        
+
+        return topic
+
     def fit(self, corpus: list[str], verbose: bool = True):
         """
         Compute embeddings if necessary, extract topics, and describe them.

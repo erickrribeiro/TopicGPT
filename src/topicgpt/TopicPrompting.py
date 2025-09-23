@@ -412,7 +412,10 @@ class TopicPrompting:
 
         topic = self.topic_lis[topic_index]
 
-        query_embedding = self.client.embeddings.create(input = [query], model = self.openai_embedding_model)["data"][0]["embedding"]
+        query_embedding = self.client.embeddings.create(
+            input=[query],
+            model=self.openai_embedding_model
+        ).data[0].embedding
 
         query_similarities = topic.document_embeddings_hd @ query_embedding / (np.linalg.norm(topic.document_embeddings_hd, axis = 1) * np.linalg.norm(query_embedding))
 
@@ -470,7 +473,7 @@ class TopicPrompting:
                 response_message = self.client.chat.completions.create(model = self.openai_prompting_model,
                 messages = messages,
                 functions = [self.function_descriptions["knn_search"]],
-                function_call = "auto")["choices"][0]["message"]
+                function_call = "auto").choices[0].message
 
                 # Step 2: check if GPT wanted to call a function
                 function_call = response_message.get("function_call")
@@ -553,16 +556,17 @@ class TopicPrompting:
             ]
         for _ in range(n_tries):
             try: 
-                response_message = self.client.chat.completions.create(model = self.openai_prompting_model,
-                messages = messages)["choices"][0]["message"]
+                response_message = self.client.chat.completions.create(
+                    model=self.openai_prompting_model,
+                    messages=messages,
+                    temperature=0,
+                ).choices[0].message
 
             except (TypeError, ValueError, openai.APIError, openai.APIConnectionError) as error:
                 print("Error occured: ", error)
                 print("Trying again...")
 
-
-
-        response_text = response_message["content"]
+        response_text = response_message.content
         # find integer number in response text
         try:
             match = re.search(r'(-?\d+)', response_text)
@@ -715,7 +719,12 @@ class TopicPrompting:
         assert len(keywords) > 1, "Need at least two keywords to split the topic! Otherwise use the split_topic_single_keyword function!"
         keyword_embeddings = []
         for keyword in keywords:
-            keyword_embeddings.append(self.client.embeddings.create(input = [keyword], model = self.openai_embedding_model)["data"][0]["embedding"])
+            keyword_embeddings.append(
+                self.client.embeddings.create(
+                    input=[keyword],
+                    model=self.openai_embedding_model
+                ).data[0].embedding
+            )
         keyword_embeddings = np.array(keyword_embeddings)
 
         old_topic = self.topic_lis[topic_idx]
@@ -827,8 +836,10 @@ class TopicPrompting:
         """
 
         umap_mapper = self.topic_lis[0].umap_mapper
-
-        keyword_embedding_hd = self.client.embeddings.create(input = [keyword], model = self.openai_embedding_model)["data"][0]["embedding"]
+        keyword_embedding_hd = self.client.embeddings.create(
+            input=[keyword], 
+            model=self.openai_embedding_model
+        ).data[0].embedding
         keyword_embedding_hd = np.array(keyword_embedding_hd).reshape(1, -1)
         keyword_embedding_ld = umap_mapper.transform(keyword_embedding_hd)[0]
 
